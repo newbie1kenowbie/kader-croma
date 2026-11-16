@@ -15,10 +15,10 @@ Open Kader Chroma in **Microsoft Edge** of **Google Chrome** en klik op **Instal
 Op een Windows-pc met Node.js 22+:
 
 ```bash
-npm install
+npm install --legacy-peer-deps
 npm run build
 npx esbuild server.ts --bundle --platform=node --format=cjs --external:vite --outfile=electron/server.cjs
-npm install --no-save electron electron-builder
+npm install --no-save --legacy-peer-deps electron electron-builder
 npx electron-builder --config electron-builder.yml --win nsis
 ```
 

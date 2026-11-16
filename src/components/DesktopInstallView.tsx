@@ -3,10 +3,10 @@ import { Check, Copy, GitBranch, Laptop, Terminal } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
-const BUILD_COMMANDS = `npm install
+const BUILD_COMMANDS = `npm install --legacy-peer-deps
 npm run build
 npx esbuild server.ts --bundle --platform=node --format=cjs --external:vite --outfile=electron/server.cjs
-npm install --no-save electron electron-builder
+npm install --no-save --legacy-peer-deps electron electron-builder
 npx electron-builder --config electron-builder.yml --win nsis`;
 
 export const DesktopInstallView: React.FC = () => {
