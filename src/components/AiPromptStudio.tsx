@@ -2,20 +2,24 @@ import React, { useState } from 'react';
 import { ArrowUp, RotateCcw, BookmarkPlus, Eye, Loader2 } from 'lucide-react';
 import { LightroomPreset } from '../types/preset';
 
+export type PromptMode = 'modify' | 'create';
+
 interface AiPromptStudioProps {
   preset: LightroomPreset;
+  promptMode: PromptMode;
+  onChangePromptMode: (mode: PromptMode) => void;
   isGenerating: boolean;
   errorMessage: string | null;
   includeActivePhoto: boolean;
   onToggleIncludePhoto: (val: boolean) => void;
-  onSubmitPrompt: (prompt: string) => void;
+  onSubmitPrompt: (prompt: string, mode: PromptMode) => void;
   onRevertIteration: (iterationId: string) => void;
   onSavePresetToLibrary: () => void;
   onUpdatePresetName: (name: string) => void;
   savedFeedback: boolean;
 }
 
-const QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
+const MODIFY_QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
   {
     label: 'Dieper & filmischer',
     prompt: 'Maak de schaduwen dieper en filmischer met een lichte matte zwartlift en zachte hooglicht-rolloff.',
@@ -29,21 +33,50 @@ const QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
     prompt: 'Verkoel de witbalans naar een ingetogen Scandinavische stijl met gedempt groen en leisteenblauwe schaduwen.',
   },
   {
-    label: 'Kodak Portra kleur',
-    prompt: 'Transformeer richting Kodak Portra 400: lichte schaduwen, subtiele warme middentonen, natuurlijk rood/oranje en fijne filmkorrel.',
-  },
-  {
     label: 'Minder verzadigd groen',
     prompt: 'Demp felle groene en gele tinten richting ingetogen olijfgroen zodat het onderwerp beter naar voren komt.',
   },
   {
-    label: 'Hoog contrast Zwart-Wit',
-    prompt: 'Zet om naar een rijke zilvergelatine zwart-wit preset met stevig microcontrast, donkere blauwe luchten en organische korrel.',
+    label: 'Huidtinten flatteren',
+    prompt: 'Optimaliseer de oranje en rode kanalen voor natuurlijke, zachte huidtinten met iets lagere textuur.',
+  },
+  {
+    label: 'Minder korrel',
+    prompt: 'Verwijder de filmkorrel voor een schone, moderne digitale uitstraling.',
+  },
+];
+
+const CREATE_QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
+  {
+    label: 'Kodachrome 70s Roadtrip',
+    prompt: 'Een nostalgische jaren 70 Kodachrome roadtrip-stijl met rijke rode accenten, warme schaduwen, stevig contrast en analoge korrel.',
+  },
+  {
+    label: 'Classic Chrome Reportage',
+    prompt: 'Fujifilm Classic Chrome documentairestijl: ingetogen verzadiging, diepe cyaan-blauwe tinten en strakke hooglichten.',
+  },
+  {
+    label: 'Teal & Amber Bioscoop',
+    prompt: 'Dramatische bioscooplook met koele teal schaduwen, warme amber hooglichten en diep microcontrast.',
+  },
+  {
+    label: 'Luchtige Japanse Film',
+    prompt: 'Heldere, luchtige Japanse overbelichte filmlook met pastel tinten, opgelichte schaduwen en zachte hooglichten.',
+  },
+  {
+    label: 'Donkere Noordse Kust',
+    prompt: 'Sombere Noord-Europese editorial look met koele leisteen-kleuren, matte zwarttinten en gedempt groen.',
+  },
+  {
+    label: 'Zilvergelatine Zwart-Wit',
+    prompt: 'Klassiek hoog-contrast analoog zwart-wit profiel met donkere luchten, heldere huidtinten en stevige korrel.',
   },
 ];
 
 export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
   preset,
+  promptMode,
+  onChangePromptMode,
   isGenerating,
   errorMessage,
   includeActivePhoto,
@@ -59,11 +92,12 @@ export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!promptInput.trim() || isGenerating) return;
-    onSubmitPrompt(promptInput.trim());
+    onSubmitPrompt(promptInput.trim(), promptMode);
     setPromptInput('');
   };
 
   const latestIteration = preset.history[0] ?? null;
+  const quickList = promptMode === 'create' ? CREATE_QUICK_PROMPTS : MODIFY_QUICK_PROMPTS;
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,10 +124,38 @@ export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
         </button>
       </div>
 
+      {/* Mode toggle: Modify current vs Create brand new style */}
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0C0D0F] border border-white/[0.08]">
+        <button
+          type="button"
+          onClick={() => onChangePromptMode('modify')}
+          className={`py-1.5 px-2.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+            promptMode === 'modify'
+              ? 'bg-[#1C1F24] text-[#F2F2F0] border border-white/[0.08]'
+              : 'text-[#9A9FA8] hover:text-[#F2F2F0]'
+          }`}
+        >
+          Bestaande aanpassen
+        </button>
+        <button
+          type="button"
+          onClick={() => onChangePromptMode('create')}
+          className={`py-1.5 px-2.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+            promptMode === 'create'
+              ? 'bg-[#1C1F24] text-[#E5A93C] border border-[#E5A93C]/30'
+              : 'text-[#9A9FA8] hover:text-[#F2F2F0]'
+          }`}
+        >
+          Nieuwe stijl creëren
+        </button>
+      </div>
+
       {/* Natural language prompt form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
         <label htmlFor="preset-prompt-input" className="text-xs font-medium text-[#C8CCD4]">
-          Pas stijl aan met een tekstprompt
+          {promptMode === 'create'
+            ? 'Beschrijf de nieuwe stijl die je wilt creëren'
+            : 'Beschrijf hoe je de huidige stijl wilt aanpassen'}
         </label>
 
         <div className="relative rounded-xl border border-white/[0.12] bg-[#0C0D0F] focus-within:border-[#E5A93C] transition-colors">
@@ -106,12 +168,16 @@ export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 if (promptInput.trim() && !isGenerating) {
-                  onSubmitPrompt(promptInput.trim());
+                  onSubmitPrompt(promptInput.trim(), promptMode);
                   setPromptInput('');
                 }
               }
             }}
-            placeholder="Bijv. 'Maak de schaduwen iets koeler, bescherm de huidtinten en voeg subtiele analoge korrel toe...'"
+            placeholder={
+              promptMode === 'create'
+                ? "Bijv. 'Creëer een warme jaren 70 Kodachrome roadtrip-stijl met zachte matte schaduwen en lichte filmkorrel...'"
+                : "Bijv. 'Maak de schaduwen iets koeler, bescherm de huidtinten en voeg subtiele analoge korrel toe...'"
+            }
             className="w-full bg-transparent px-3.5 pt-3 pb-11 text-sm text-[#F2F2F0] placeholder:text-[#6B717C] resize-none focus:outline-none"
           />
 
@@ -135,12 +201,12 @@ export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
               {isGenerating ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Aanpassen...</span>
+                  <span>{promptMode === 'create' ? 'Creëren...' : 'Aanpassen...'}</span>
                 </>
               ) : (
                 <>
                   <ArrowUp className="w-3.5 h-3.5" />
-                  <span>Pas toe</span>
+                  <span>{promptMode === 'create' ? 'Creëer stijl' : 'Pas toe'}</span>
                 </>
               )}
             </button>
@@ -154,16 +220,18 @@ export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
         </div>
       )}
 
-      {/* Quick modifier buttons */}
+      {/* Quick prompt buttons */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-[#9A9FA8]">Snelle stijlaanpassingen</span>
+        <span className="text-xs font-medium text-[#9A9FA8]">
+          {promptMode === 'create' ? 'Stijl-ideeën om vanaf nul te creëren' : 'Snelle stijlaanpassingen'}
+        </span>
         <div className="flex flex-wrap gap-1.5">
-          {QUICK_PROMPTS.map((qp) => (
+          {quickList.map((qp) => (
             <button
               key={qp.label}
               type="button"
               disabled={isGenerating}
-              onClick={() => onSubmitPrompt(qp.prompt)}
+              onClick={() => onSubmitPrompt(qp.prompt, promptMode)}
               className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-white/[0.08] bg-[#1C1F24] hover:border-[#E5A93C]/50 hover:text-[#F2F2F0] text-[#C8CCD4] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
             >
               {qp.label}
@@ -176,7 +244,7 @@ export const AiPromptStudio: React.FC<AiPromptStudioProps> = ({
       {latestIteration && (
         <div className="pt-3 border-t border-white/[0.08] flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-[#E5A93C]">Laatste AI-aanpassing</span>
+            <span className="text-xs font-medium text-[#E5A93C]">Laatste AI-resultaat</span>
             <button
               type="button"
               onClick={() => onRevertIteration(latestIteration.id)}

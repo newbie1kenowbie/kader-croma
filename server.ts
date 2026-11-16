@@ -4,7 +4,7 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
-import { transformPresetLocally } from './src/lib/localPresetEngine.ts';
+import { createPresetLocally, transformPresetLocally } from './src/lib/localPresetEngine.ts';
 
 dotenv.config();
 
@@ -244,28 +244,36 @@ async function startServer() {
     res.json({ ok: true });
   });
 
-  // Transform or refine an existing Lightroom preset using a natural-language prompt
+  // Transform, refine, or create a brand-new Lightroom preset using a natural-language prompt
   app.post('/api/presets/transform', async (req, res) => {
     try {
-      const { currentPreset, prompt, imageBase64, imageMimeType } = req.body ?? {};
+      const { currentPreset, prompt, mode, imageBase64, imageMimeType } = req.body ?? {};
       if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-        res.status(400).json({ error: 'Geef een duidelijke tekstprompt op om de preset aan te passen.' });
+        res.status(400).json({ error: 'Geef een duidelijke tekstprompt op om een preset te genereren.' });
         return;
       }
 
+      const isCreateMode = mode === 'create';
       const ai = getAiClient();
       if (!ai) {
-        const localResult = transformPresetLocally(
-          currentPreset?.name || 'Aangepaste Stijl',
-          currentPreset?.description || 'Lokale Lightroom preset.',
-          sanitizeAdjustments(currentPreset?.adjustments ?? {}),
-          prompt.trim()
-        );
+        const localResult = isCreateMode
+          ? createPresetLocally(prompt.trim())
+          : transformPresetLocally(
+              currentPreset?.name || 'Aangepaste Stijl',
+              currentPreset?.description || 'Lokale Lightroom preset.',
+              sanitizeAdjustments(currentPreset?.adjustments ?? {}),
+              prompt.trim()
+            );
         res.json({ ...localResult, mode: 'local' });
         return;
       }
 
-      const textPrompt = `Huidige preset: "${currentPreset?.name ?? 'Onbenoemd'}" (${currentPreset?.description ?? ''}).
+      const textPrompt = isCreateMode
+        ? `Creëer een VOLLEDIG NIEUWE, originele Adobe Lightroom preset vanaf nul op basis van deze omschrijving van de fotograaf:
+"${prompt.trim()}"
+
+Negeer eventuele oude presets en ontwerp vanaf een leeg canvas de ideale kleurtemperatuur, belichting, tooncurve, HSL-kleurenmixer, color grading (schaduwen/middentonen/hooglichten) en filmkorrel voor deze gewenste stijl. Geef een pakkende Nederlandse naam van maximaal 4 woorden.`
+        : `Huidige preset: "${currentPreset?.name ?? 'Onbenoemd'}" (${currentPreset?.description ?? ''}).
 Huidige Lightroom-instellingen (JSON):
 ${JSON.stringify(currentPreset?.adjustments ?? {}, null, 2)}
 

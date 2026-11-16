@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppView, TopBar } from './components/TopBar';
 import { BeforeAfterCanvas } from './components/BeforeAfterCanvas';
-import { AiPromptStudio } from './components/AiPromptStudio';
+import { AiPromptStudio, PromptMode } from './components/AiPromptStudio';
 import { SlidersInspector } from './components/SlidersInspector';
 import { ImportStyleView } from './components/ImportStyleView';
 import { PresetLibraryView } from './components/PresetLibraryView';
@@ -9,7 +9,7 @@ import { XmpInspectorView } from './components/XmpInspectorView';
 import { DesktopInstallView } from './components/DesktopInstallView';
 import { OfflineIndicator, PWAInstallButton } from './components/PWAInstallButton';
 import { SAMPLE_PHOTOS, STARTER_PRESETS } from './lib/starterPresets';
-import { transformPresetLocally } from './lib/localPresetEngine';
+import { createPresetLocally, transformPresetLocally } from './lib/localPresetEngine';
 import { presetToXmp } from './lib/xmpParser';
 import {
   DEFAULT_ADJUSTMENTS,
@@ -26,6 +26,7 @@ type InspectorTab = 'prompt' | 'tone' | 'hsl';
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>('studio');
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('prompt');
+  const [promptMode, setPromptMode] = useState<PromptMode>('modify');
 
   const [customPresets, setCustomPresets] = useState<LightroomPreset[]>(() => {
     try {
@@ -126,13 +127,64 @@ export default function App() {
     setTimeout(() => setSavedFeedback(false), 1800);
   };
 
-  const handleSubmitPrompt = async (prompt: string) => {
+  const handleSubmitPrompt = async (prompt: string, mode: PromptMode) => {
     setIsGenerating(true);
     setAiError(null);
 
     const previousAdjustments: PresetAdjustments = JSON.parse(
       JSON.stringify(activePreset.adjustments)
     );
+
+    const applyResult = (result: {
+      name: string;
+      description: string;
+      reasoning: string;
+      changedFields: string[];
+      adjustments: PresetAdjustments;
+    }) => {
+      if (mode === 'create') {
+        setActivePreset({
+          id: `custom-${Date.now()}`,
+          name: result.name,
+          description: result.description,
+          category: 'aangepast',
+          source: 'ai-generated',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          adjustments: result.adjustments,
+          history: [
+            {
+              id: `iter-${Date.now()}`,
+              prompt,
+              reasoning: result.reasoning,
+              changedFields: result.changedFields || [],
+              timestamp: Date.now(),
+              adjustmentsSnapshot: previousAdjustments,
+            },
+          ],
+        });
+        setPromptMode('modify');
+      } else {
+        setActivePreset((prev) => ({
+          ...prev,
+          name: result.name || prev.name,
+          description: result.description || prev.description,
+          updatedAt: Date.now(),
+          adjustments: result.adjustments,
+          history: [
+            {
+              id: `iter-${Date.now()}`,
+              prompt,
+              reasoning: result.reasoning,
+              changedFields: result.changedFields || [],
+              timestamp: Date.now(),
+              adjustmentsSnapshot: previousAdjustments,
+            },
+            ...prev.history,
+          ].slice(0, 15),
+        }));
+      }
+    };
 
     try {
       const response = await fetch('/api/presets/transform', {
@@ -141,6 +193,7 @@ export default function App() {
         body: JSON.stringify({
           currentPreset: activePreset,
           prompt,
+          mode,
           imageBase64: includeActivePhoto ? activePhotoBase64?.data : undefined,
           imageMimeType: includeActivePhoto ? activePhotoBase64?.mimeType : undefined,
         }),
@@ -148,52 +201,27 @@ export default function App() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Kon de preset niet aanpassen.');
+        throw new Error(data.error || 'Kon de preset niet verwerken.');
       }
 
-      setActivePreset((prev) => ({
-        ...prev,
-        name: data.name || prev.name,
-        description: data.description || prev.description,
-        updatedAt: Date.now(),
+      applyResult({
+        name: data.name || activePreset.name,
+        description: data.description || activePreset.description,
+        reasoning: data.reasoning,
+        changedFields: data.changedFields || [],
         adjustments: data.adjustments,
-        history: [
-          {
-            id: `iter-${Date.now()}`,
-            prompt,
-            reasoning: data.reasoning,
-            changedFields: data.changedFields || [],
-            timestamp: Date.now(),
-            adjustmentsSnapshot: previousAdjustments,
-          },
-          ...prev.history,
-        ].slice(0, 15),
-      }));
+      });
     } catch {
-      const localResult = transformPresetLocally(
-        activePreset.name,
-        activePreset.description,
-        activePreset.adjustments,
-        prompt
-      );
-      setActivePreset((prev) => ({
-        ...prev,
-        name: localResult.name,
-        description: localResult.description,
-        updatedAt: Date.now(),
-        adjustments: localResult.adjustments,
-        history: [
-          {
-            id: `iter-${Date.now()}`,
-            prompt,
-            reasoning: localResult.reasoning,
-            changedFields: localResult.changedFields,
-            timestamp: Date.now(),
-            adjustmentsSnapshot: previousAdjustments,
-          },
-          ...prev.history,
-        ].slice(0, 15),
-      }));
+      const localResult =
+        mode === 'create'
+          ? createPresetLocally(prompt)
+          : transformPresetLocally(
+              activePreset.name,
+              activePreset.description,
+              activePreset.adjustments,
+              prompt
+            );
+      applyResult(localResult);
     } finally {
       setIsGenerating(false);
     }
@@ -310,6 +338,8 @@ export default function App() {
                 {inspectorTab === 'prompt' && (
                   <AiPromptStudio
                     preset={activePreset}
+                    promptMode={promptMode}
+                    onChangePromptMode={setPromptMode}
                     isGenerating={isGenerating}
                     errorMessage={aiError}
                     includeActivePhoto={includeActivePhoto}

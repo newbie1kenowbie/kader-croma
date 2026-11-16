@@ -187,6 +187,64 @@ export function transformPresetLocally(
     note('Vignet', next.vignetteAmount);
   }
 
+  // Kodachrome / 70s vintage / retro
+  if (/\b(kodachrome|70s|retro|vintage|roadtrip|warm analoog)\b/.test(p)) {
+    next.temperature = clamp(next.temperature + 10, -100, 100);
+    next.contrast = clamp(next.contrast + 18, -100, 100);
+    next.highlights = clamp(next.highlights - 22, -100, 100);
+    next.shadows = clamp(next.shadows + 14, -100, 100);
+    next.hsl.red.saturation = clamp(next.hsl.red.saturation + 16, -100, 100);
+    next.hsl.yellow.hue = clamp(next.hsl.yellow.hue - 16, -100, 100);
+    next.hsl.green.hue = clamp(next.hsl.green.hue - 20, -100, 100);
+    next.hsl.green.saturation = clamp(next.hsl.green.saturation - 18, -100, 100);
+    next.colorGrading.shadows.hue = 38;
+    next.colorGrading.shadows.saturation = 12;
+    next.grainAmount = clamp(Math.max(next.grainAmount, 24), 0, 100);
+    changes.push('Rood +16', `Contrast ${next.contrast}`, `Korrel ${next.grainAmount}`);
+  }
+
+  // Fujifilm Classic Chrome / documentary
+  if (/\b(fuji|fujifilm|classic chrome|documentaire|reportage)\b/.test(p)) {
+    next.contrast = clamp(next.contrast + 14, -100, 100);
+    next.highlights = clamp(next.highlights - 28, -100, 100);
+    next.shadows = clamp(next.shadows + 10, -100, 100);
+    next.saturation = clamp(next.saturation - 14, -100, 100);
+    next.hsl.aqua.hue = clamp(next.hsl.aqua.hue - 14, -100, 100);
+    next.hsl.blue.saturation = clamp(next.hsl.blue.saturation - 18, -100, 100);
+    next.hsl.green.saturation = clamp(next.hsl.green.saturation - 24, -100, 100);
+    next.grainAmount = clamp(Math.max(next.grainAmount, 16), 0, 100);
+    changes.push('Classic Chrome tint', `Verzadiging ${next.saturation}`, `Hooglichten ${next.highlights}`);
+  }
+
+  // Teal & Orange / cinema blockbuster
+  if (/\b(teal|orange|oranje|bioscoop|blockbuster|neon|cyber)\b/.test(p)) {
+    next.contrast = clamp(next.contrast + 20, -100, 100);
+    next.highlights = clamp(next.highlights - 24, -100, 100);
+    next.shadows = clamp(next.shadows + 18, -100, 100);
+    next.hsl.aqua.hue = -16;
+    next.hsl.blue.hue = -24;
+    next.hsl.orange.saturation = clamp(next.hsl.orange.saturation + 18, -100, 100);
+    next.colorGrading.shadows.hue = 194;
+    next.colorGrading.shadows.saturation = 28;
+    next.colorGrading.highlights.hue = 34;
+    next.colorGrading.highlights.saturation = 22;
+    changes.push('Teal schaduwen', 'Amber hooglichten', `Contrast ${next.contrast}`);
+  }
+
+  // Pastel / wedding / Japanese airy
+  if (/\b(pastel|bruiloft|wedding|japans|luchtig|airy|dromerig)\b/.test(p)) {
+    next.exposure = Number(clamp(next.exposure + 0.35, -3, 3).toFixed(2));
+    next.contrast = clamp(next.contrast - 16, -100, 100);
+    next.highlights = clamp(next.highlights - 30, -100, 100);
+    next.shadows = clamp(next.shadows + 32, -100, 100);
+    next.saturation = clamp(next.saturation - 12, -100, 100);
+    next.clarity = clamp(next.clarity - 12, -100, 100);
+    next.colorGrading.highlights.hue = 44;
+    next.colorGrading.highlights.saturation = 10;
+    note('Belichting', next.exposure, 2);
+    changes.push(`Schaduwen ${next.shadows}`, `Helderheid ${next.clarity}`);
+  }
+
   // Generic gentle polish if user wrote a custom phrase not matching keywords above
   if (changes.length === 0) {
     next.contrast = clamp(next.contrast + 8, -100, 100);
@@ -209,6 +267,31 @@ export function transformPresetLocally(
     reasoning: `Lokale preset-engine (zonder API-sleutel): stijl aangepast op basis van "${prompt.trim()}".`,
     changedFields: dedupedChanges,
     adjustments: next,
+  };
+}
+
+export function createPresetLocally(prompt: string): LocalTransformResult {
+  const cleaned = prompt.trim();
+  const words = cleaned
+    .replace(/[^a-zA-Z0-9À-ÿ\s-]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  const generatedName = words.length > 0 ? words.join(' ') : 'Nieuwe AI Stijl';
+
+  const result = transformPresetLocally(
+    generatedName,
+    `Nieuwe stijl gecreëerd op basis van: "${cleaned}".`,
+    cloneAdj(DEFAULT_ADJUSTMENTS),
+    cleaned
+  );
+
+  return {
+    ...result,
+    name: result.name === 'Neutraal Basisprofiel' ? generatedName : result.name,
+    description: `Nieuwe stijl gecreëerd op basis van: "${cleaned}".`,
+    reasoning: `Lokale preset-engine (zonder API-sleutel): nieuwe stijl vanaf nul opgebouwd voor "${cleaned}".`,
   };
 }
 
