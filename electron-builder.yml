@@ -1,0 +1,25 @@
+appId: nl.kaderchroma.studio
+productName: Kader Chroma
+copyright: Copyright © 2026 Kader Chroma
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/**/*
+  - server.ts
+  - public/pwa-512x512.png
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: public/pwa-512x512.png
+  artifactName: Kader-Chroma-Setup-${version}.exe
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Kader Chroma

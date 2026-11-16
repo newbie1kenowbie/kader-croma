@@ -1,0 +1,6 @@
+{
+  "name": "Kader Chroma",
+  "description": "AI-aangedreven Lightroom preset engine waarmee je bestaande stijlen importeert, met tekstprompts verfijnt en direct als Adobe .XMP exporteert.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
