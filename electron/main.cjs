@@ -7,7 +7,7 @@ const PORT = 3489;
 let mainWindow = null;
 let serverProcess = null;
 
-function waitForServer(url, retries = 30) {
+function waitForServer(url, retries = 40) {
   return new Promise((resolve, reject) => {
     const attempt = (left) => {
       http
@@ -28,9 +28,14 @@ function waitForServer(url, retries = 30) {
 }
 
 function startLocalBackend() {
-  const serverEntry = path.join(__dirname, '..', 'server.ts');
+  const unpackedDir = __dirname.includes('app.asar')
+    ? __dirname.replace('app.asar', 'app.asar.unpacked')
+    : __dirname;
+  const serverEntry = path.join(unpackedDir, 'server.cjs');
+
   const env = {
     ...process.env,
+    ELECTRON_RUN_AS_NODE: '1',
     NODE_ENV: 'production',
     PORT: String(PORT),
   };

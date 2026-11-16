@@ -1,6 +1,9 @@
 node_modules/
 build/
 dist/
+release/
+electron/server.cjs
+server.js
 coverage/
 .DS_Store
 *.log

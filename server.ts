@@ -1,14 +1,12 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const currentDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -370,13 +368,22 @@ ${prompt ? `Extra aanwijzing van de fotograaf: "${prompt}"` : ''}`;
   });
 
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    const envDist = process.env.KADER_DIST_DIR;
+    const rootDist = path.resolve(currentDir, 'dist');
+    const parentDist = path.resolve(currentDir, '..', 'dist');
+    const distPath =
+      envDist && fs.existsSync(envDist)
+        ? envDist
+        : fs.existsSync(rootDist)
+          ? rootDist
+          : parentDist;
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

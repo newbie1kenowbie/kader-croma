@@ -3,10 +3,13 @@ productName: Kader Chroma
 copyright: Copyright © 2026 Kader Chroma
 directories:
   output: release
+asarUnpack:
+  - dist/**/*
+  - electron/server.cjs
 files:
   - dist/**/*
-  - electron/**/*
-  - server.ts
+  - electron/main.cjs
+  - electron/server.cjs
   - public/pwa-512x512.png
   - package.json
 win:
