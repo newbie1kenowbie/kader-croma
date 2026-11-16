@@ -24,10 +24,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
 
       - name: Dependencies installeren
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Frontend bundelen
         run: npm run build
@@ -36,7 +35,7 @@ jobs:
         run: npx esbuild server.ts --bundle --platform=node --format=cjs --external:vite --outfile=electron/server.cjs
 
       - name: Electron & electron-builder installeren
-        run: npm install --no-save electron electron-builder
+        run: npm install --no-save --no-audit --no-fund electron electron-builder
 
       - name: Windows NSIS Installer (.exe) bouwen
         run: npx electron-builder --config electron-builder.yml --win nsis --publish never

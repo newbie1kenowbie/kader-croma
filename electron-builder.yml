@@ -1,6 +1,8 @@
 appId: nl.kaderchroma.studio
 productName: Kader Chroma
 copyright: Copyright © 2026 Kader Chroma
+extraMetadata:
+  main: electron/main.cjs
 directories:
   output: release
 asarUnpack:
