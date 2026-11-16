@@ -1,8 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { transformPresetLocally } from './src/lib/localPresetEngine.ts';
 
 dotenv.config();
 
@@ -10,10 +12,10 @@ const currentDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
 const PORT = Number(process.env.PORT) || 3000;
 
-function getAiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+function getAiClient(): GoogleGenAI | null {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY ontbreekt in de serveromgeving.');
+    return null;
   }
   return new GoogleGenAI({
     apiKey,
@@ -252,6 +254,17 @@ async function startServer() {
       }
 
       const ai = getAiClient();
+      if (!ai) {
+        const localResult = transformPresetLocally(
+          currentPreset?.name || 'Aangepaste Stijl',
+          currentPreset?.description || 'Lokale Lightroom preset.',
+          sanitizeAdjustments(currentPreset?.adjustments ?? {}),
+          prompt.trim()
+        );
+        res.json({ ...localResult, mode: 'local' });
+        return;
+      }
+
       const textPrompt = `Huidige preset: "${currentPreset?.name ?? 'Onbenoemd'}" (${currentPreset?.description ?? ''}).
 Huidige Lightroom-instellingen (JSON):
 ${JSON.stringify(currentPreset?.adjustments ?? {}, null, 2)}
@@ -316,6 +329,13 @@ Pas de huidige Lightroom-instellingen aan volgens de opdracht van de fotograaf. 
       }
 
       const ai = getAiClient();
+      if (!ai) {
+        res.json({
+          mode: 'local-fallback-required',
+        });
+        return;
+      }
+
       const cleanBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 
       const extractPrompt = `Analyseer de kleurgradatie (color grading), witbalans, contrastverhouding, schaduwlift/matte zwartpunten, hooglicht-rolloff, HSL-kleurverschuivingen, split toning (kleur in schaduwen en hooglichten) en filmkorrel van deze referentiefoto.
@@ -367,10 +387,64 @@ ${prompt ? `Extra aanwijzing van de fotograaf: "${prompt}"` : ''}`;
     }
   });
 
+  const httpServer = http.createServer(app);
+  const disableHmr = process.env.DISABLE_HMR === 'true' || process.env.ENABLE_HMR !== 'true';
+  if (disableHmr && !process.env.DISABLE_HMR) {
+    process.env.DISABLE_HMR = 'true';
+  }
+
   if (process.env.NODE_ENV !== 'production') {
+    if (disableHmr) {
+      app.get('/@vite/client', (_req, res) => {
+        res.type('application/javascript').send(`
+const sheetsMap = new Map();
+export function updateStyle(id, content) {
+  let style = sheetsMap.get(id);
+  if (!style) {
+    style = document.createElement('style');
+    style.setAttribute('type', 'text/css');
+    style.setAttribute('data-vite-dev-id', id);
+    style.textContent = content;
+    document.head.appendChild(style);
+    sheetsMap.set(id, style);
+  } else if (style.textContent !== content) {
+    style.textContent = content;
+  }
+}
+export function removeStyle(id) {
+  const style = sheetsMap.get(id);
+  if (style) {
+    style.remove();
+    sheetsMap.delete(id);
+  }
+}
+export function createHotContext() {
+  return {
+    accept() {},
+    dispose() {},
+    prune() {},
+    invalidate() {},
+    on() {},
+    off() {},
+    send() {},
+    data: {},
+  };
+}
+export function injectQuery(url) {
+  return url;
+}
+export class ErrorOverlay {}
+`);
+      });
+    }
+
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: disableHmr ? false : { server: httpServer },
+        ws: disableHmr ? false : undefined,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -390,8 +464,8 @@ ${prompt ? `Extra aanwijzing van de fotograaf: "${prompt}"` : ''}`;
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Kader Atelier server draait op http://0.0.0.0:${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`Kader Chroma server draait op http://0.0.0.0:${PORT}`);
   });
 }
 

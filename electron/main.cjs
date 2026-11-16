@@ -27,6 +27,30 @@ function waitForServer(url, retries = 40) {
   });
 }
 
+function loadEnvFileIfExists(filePath, targetEnv) {
+  const fs = require('fs');
+  if (!fs.existsSync(filePath)) return;
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (key && !targetEnv[key]) {
+        targetEnv[key] = val;
+      }
+    }
+  } catch {
+    // Ignore unreadable .env file
+  }
+}
+
 function startLocalBackend() {
   const unpackedDir = __dirname.includes('app.asar')
     ? __dirname.replace('app.asar', 'app.asar.unpacked')
@@ -39,6 +63,9 @@ function startLocalBackend() {
     NODE_ENV: 'production',
     PORT: String(PORT),
   };
+
+  loadEnvFileIfExists(path.join(app.getPath('userData'), '.env'), env);
+  loadEnvFileIfExists(path.join(path.dirname(process.execPath), '.env'), env);
 
   serverProcess = spawn(process.execPath, [serverEntry], {
     env,

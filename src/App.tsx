@@ -9,6 +9,7 @@ import { XmpInspectorView } from './components/XmpInspectorView';
 import { DesktopInstallView } from './components/DesktopInstallView';
 import { OfflineIndicator, PWAInstallButton } from './components/PWAInstallButton';
 import { SAMPLE_PHOTOS, STARTER_PRESETS } from './lib/starterPresets';
+import { transformPresetLocally } from './lib/localPresetEngine';
 import { presetToXmp } from './lib/xmpParser';
 import {
   DEFAULT_ADJUSTMENTS,
@@ -168,8 +169,31 @@ export default function App() {
           ...prev.history,
         ].slice(0, 15),
       }));
-    } catch (err: any) {
-      setAiError(err?.message || 'Er ging iets mis bij het aanpassen van de preset.');
+    } catch {
+      const localResult = transformPresetLocally(
+        activePreset.name,
+        activePreset.description,
+        activePreset.adjustments,
+        prompt
+      );
+      setActivePreset((prev) => ({
+        ...prev,
+        name: localResult.name,
+        description: localResult.description,
+        updatedAt: Date.now(),
+        adjustments: localResult.adjustments,
+        history: [
+          {
+            id: `iter-${Date.now()}`,
+            prompt,
+            reasoning: localResult.reasoning,
+            changedFields: localResult.changedFields,
+            timestamp: Date.now(),
+            adjustmentsSnapshot: previousAdjustments,
+          },
+          ...prev.history,
+        ].slice(0, 15),
+      }));
     } finally {
       setIsGenerating(false);
     }

@@ -23,3 +23,6 @@ npx electron-builder --config electron-builder.yml --win nsis
 ```
 
 Het installatiebestand verschijnt in `release/Kader-Chroma-Setup-0.0.0.exe`.
+
+> Tip: Zet `GEMINI_API_KEY` als Windows-omgevingsvariabele (of plaats een `.env`-bestand met `GEMINI_API_KEY=...` in `%APPDATA%\Kader Chroma\.env`) om AI-aanpassingen vanuit de losstaande `.exe` te gebruiken.
+

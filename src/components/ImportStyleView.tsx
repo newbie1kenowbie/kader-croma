@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { FileCode2, ImagePlus, Upload, Loader2, ArrowRight } from 'lucide-react';
 import { parseImportedPreset, SAMPLE_XMP_SNIPPET } from '../lib/xmpParser';
+import { extractStyleFromPhotoLocally } from '../lib/localPresetEngine';
 import { LightroomPreset } from '../types/preset';
 
 interface ImportStyleViewProps {
@@ -100,9 +101,13 @@ export const ImportStyleView: React.FC<ImportStyleViewProps> = ({ onImportPreset
         }),
       });
 
-      const data = await resp.json();
+      let data = await resp.json();
       if (!resp.ok) {
         throw new Error(data.error || 'Kon geen kleurstijl uit de referentiefoto halen.');
+      }
+
+      if (data.mode === 'local-fallback-required') {
+        data = await extractStyleFromPhotoLocally(refImageDataUrl, styleName.trim() || undefined);
       }
 
       const newPreset: LightroomPreset = {
@@ -127,8 +132,36 @@ export const ImportStyleView: React.FC<ImportStyleViewProps> = ({ onImportPreset
       };
 
       onImportPreset(newPreset);
-    } catch (err: any) {
-      setExtractError(err?.message || 'Stijl-extractie mislukt.');
+    } catch {
+      try {
+        const localData = await extractStyleFromPhotoLocally(
+          refImageDataUrl,
+          styleName.trim() || undefined
+        );
+        const newPreset: LightroomPreset = {
+          id: `preset-${Date.now()}`,
+          name: localData.name,
+          description: localData.description,
+          category: 'geimporteerd',
+          source: 'photo-extract',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          adjustments: localData.adjustments,
+          history: [
+            {
+              id: `iter-${Date.now()}`,
+              prompt: extractHint.trim() || 'Kleurstijl geëxtraheerd uit referentiefoto',
+              reasoning: localData.reasoning,
+              changedFields: localData.changedFields,
+              timestamp: Date.now(),
+              adjustmentsSnapshot: localData.adjustments,
+            },
+          ],
+        };
+        onImportPreset(newPreset);
+      } catch (localErr: any) {
+        setExtractError(localErr?.message || 'Stijl-extractie mislukt.');
+      }
     } finally {
       setIsExtracting(false);
     }
