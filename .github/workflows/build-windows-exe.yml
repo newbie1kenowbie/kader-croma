@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Repository ophalen
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Node.js 22 instellen
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
 
@@ -41,13 +41,21 @@ jobs:
         run: npx electron-builder --config electron-builder.yml --win nsis --publish never
 
       - name: Upload Kader-Chroma-Setup.exe als Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Kader-Chroma-Windows-Installer
           path: release/*.exe
 
       - name: Voeg .exe toe aan GitHub Release (alleen bij tags v*)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/*.exe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $files = Get-ChildItem -Path "release" -Filter "*.exe" | ForEach-Object { $_.FullName }
+          if (gh release view $tag 2>$null) {
+            gh release upload $tag $files --clobber
+          } else {
+            gh release create $tag $files --title $tag --generate-notes
+          }
